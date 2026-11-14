@@ -1,0 +1,463 @@
+{
+  "repository": "CarlosVargas2170/control-remote-robot-mesero",
+  "branch": "main",
+  "source": "ZIP main entregado por el usuario",
+  "items": [
+    {
+      "id": "gh_7b213181e751",
+      "path": "audio/Aqui_tienes_Que_lo_d.wav",
+      "name": "Aquí tienes. ¡Que lo disfrutes!",
+      "emoji": "🎵",
+      "bytes": 109484,
+      "local": true
+    },
+    {
+      "id": "gh_46d7a65ea2ae",
+      "path": "audio/Hola_deseas_un_Brown.wav",
+      "name": "Hola, ¿deseas un Brownie de Kiky?",
+      "emoji": "🍗",
+      "bytes": 147884,
+      "local": true
+    },
+    {
+      "id": "gh_49ae8293bf9b",
+      "path": "audio/Hola_deseas_un_Cremo.wav",
+      "name": "Hola, ¿deseas un Cremoso 3 Leches de Kiky?",
+      "emoji": "🍗",
+      "bytes": 165164,
+      "local": true
+    },
+    {
+      "id": "gh_35efacd455be",
+      "path": "audio/Muchas graacias.wav",
+      "name": "Muchas graacias",
+      "emoji": "🎵",
+      "bytes": 65324,
+      "local": true
+    },
+    {
+      "id": "gh_dc5c837df131",
+      "path": "audio/alert_siren.mp3",
+      "name": "alert siren",
+      "emoji": "🚨",
+      "bytes": 481489,
+      "local": true
+    },
+    {
+      "id": "gh_bee7f5d12f4a",
+      "path": "audio/attention_excuse_me.wav",
+      "name": "Atención, disculpe",
+      "emoji": "🎵",
+      "bytes": 1198230,
+      "local": true
+    },
+    {
+      "id": "gh_95ab72d179f0",
+      "path": "audio/attention_with_service.wav",
+      "name": "¡Con permiso por favor! Robot Mesero en servicio",
+      "emoji": "🎵",
+      "bytes": 157484,
+      "local": true
+    },
+    {
+      "id": "gh_ecdc4bfa1a82",
+      "path": "audio/audio_music_1.mp3",
+      "name": "audio music 1",
+      "emoji": "🎵",
+      "bytes": 174624,
+      "local": true
+    },
+    {
+      "id": "gh_96d557d97f3c",
+      "path": "audio/aura_farming.mp3",
+      "name": "aura farming",
+      "emoji": "🎵",
+      "bytes": 1240431,
+      "local": true
+    },
+    {
+      "id": "gh_e13af6a5c88a",
+      "path": "audio/bocina_car.mp3",
+      "name": "bocina car",
+      "emoji": "🚗",
+      "bytes": 35108,
+      "local": true
+    },
+    {
+      "id": "gh_fa435a0dd4b9",
+      "path": "audio/buy_gaseosa.wav",
+      "name": "Hola, ¿que tal?, ¿Deseas una gaseosa?",
+      "emoji": "🥤",
+      "bytes": 144428,
+      "local": true
+    },
+    {
+      "id": "gh_1ebd6e52a0fc",
+      "path": "audio/buy_gaseosa_coca_cola.wav",
+      "name": "Hola, ¿que tal?, ¿Deseas una gaseosa de Coca Cola?",
+      "emoji": "🥤",
+      "bytes": 171564,
+      "local": true
+    },
+    {
+      "id": "gh_3bf89739c96e",
+      "path": "audio/buy_gaseosa_sprite.wav",
+      "name": "Hola, ¿que tal?, ¿Deseas una gaseosa de Sprite?",
+      "emoji": "🥤",
+      "bytes": 173612,
+      "local": true
+    },
+    {
+      "id": "gh_d985581341d4",
+      "path": "audio/buy_water.wav",
+      "name": "Hola, ¿que tal?, ¿Deseas una agua vital?",
+      "emoji": "🥤",
+      "bytes": 169004,
+      "local": true
+    },
+    {
+      "id": "gh_7773c57a52e2",
+      "path": "audio/chipi_chipi_chapa.mp3",
+      "name": "chipi chipi chapa",
+      "emoji": "🎵",
+      "bytes": 548678,
+      "local": true
+    },
+    {
+      "id": "gh_cbf9c0ac310e",
+      "path": "audio/collect_tray.wav",
+      "name": "Cobrar bandeja",
+      "emoji": "📦",
+      "bytes": 1044630,
+      "local": true
+    },
+    {
+      "id": "gh_1e98e84d1b4d",
+      "path": "audio/cuarto-broasted-kiky.wav",
+      "name": "cuarto broasted kiky",
+      "emoji": "🍗",
+      "bytes": 178220,
+      "local": true
+    },
+    {
+      "id": "gh_4c7fb8ede585",
+      "path": "audio/cuarto-lena-kiky.wav",
+      "name": "cuarto lena kiky",
+      "emoji": "🍗",
+      "bytes": 142380,
+      "local": true
+    },
+    {
+      "id": "gh_6b2b10af43cd",
+      "path": "audio/dance_to_sell.wav",
+      "name": "Si me compras un café, te hago un baile",
+      "emoji": "☕",
+      "bytes": 132524,
+      "local": true
+    },
+    {
+      "id": "gh_768c7ff97331",
+      "path": "audio/dance_to_sell_dessert_kiky.wav",
+      "name": "Si me compras un postre de Kiky, te hago un baile",
+      "emoji": "🍗",
+      "bytes": 153644,
+      "local": true
+    },
+    {
+      "id": "gh_162def9a5c1f",
+      "path": "audio/eco-broasted-kiky.wav",
+      "name": "eco broasted kiky",
+      "emoji": "🍗",
+      "bytes": 171564,
+      "local": true
+    },
+    {
+      "id": "gh_84b5ee88bb13",
+      "path": "audio/eco-combo-broasted-kiky.wav",
+      "name": "eco combo broasted kiky",
+      "emoji": "🍗",
+      "bytes": 151596,
+      "local": true
+    },
+    {
+      "id": "gh_c6f3b3d5741b",
+      "path": "audio/eco-combo-lena-kiky.wav",
+      "name": "eco combo lena kiky",
+      "emoji": "🍗",
+      "bytes": 158252,
+      "local": true
+    },
+    {
+      "id": "gh_a2b513099803",
+      "path": "audio/eco-lena-kiky.wav",
+      "name": "eco lena kiky",
+      "emoji": "🍗",
+      "bytes": 169004,
+      "local": true
+    },
+    {
+      "id": "gh_f6394fce159d",
+      "path": "audio/fahh.mp3",
+      "name": "fahh",
+      "emoji": "🎵",
+      "bytes": 114866,
+      "local": true
+    },
+    {
+      "id": "gh_da7e864da018",
+      "path": "audio/fahh.wav",
+      "name": "fahh",
+      "emoji": "🎵",
+      "bytes": 831574,
+      "local": true
+    },
+    {
+      "id": "gh_976eea2190eb",
+      "path": "audio/hello.wav",
+      "name": "Hola. ¿que tal?",
+      "emoji": "👋",
+      "bytes": 65324,
+      "local": true
+    },
+    {
+      "id": "gh_c43780d051d4",
+      "path": "audio/hello_and_question_name.wav",
+      "name": "Hola Me llamo Robot Mesero ¿Tú cómo te llamas?",
+      "emoji": "👋",
+      "bytes": 234284,
+      "local": true
+    },
+    {
+      "id": "gh_6d9b18c8628b",
+      "path": "audio/help_chairs.wav",
+      "name": "help chairs",
+      "emoji": "🎵",
+      "bytes": 97964,
+      "local": true
+    },
+    {
+      "id": "gh_b8b265f68f0c",
+      "path": "audio/here_is_coffee.wav",
+      "name": "¡Aquí está tu café!",
+      "emoji": "☕",
+      "bytes": 1321110,
+      "local": true
+    },
+    {
+      "id": "gh_a98b2fb8a8cb",
+      "path": "audio/here_your_order_enjoy.wav",
+      "name": "Espero que esté justo como lo querías. ¡Que disfrutes tu pedido! fue un gusto atenderte",
+      "emoji": "📦",
+      "bytes": 297678,
+      "local": true
+    },
+    {
+      "id": "gh_83d205730f4c",
+      "path": "audio/imaginate_tecno_nexus.wav",
+      "name": "Te imaginas esta tecnología en tu negocio, Nexus Patio Tech lo hace posible",
+      "emoji": "🎵",
+      "bytes": 265260,
+      "local": true
+    },
+    {
+      "id": "gh_7d0f056c5312",
+      "path": "audio/innovation_move_with_you.wav",
+      "name": "Innovación que se mueve contigo, Nexus Patio Tech",
+      "emoji": "🎵",
+      "bytes": 186924,
+      "local": true
+    },
+    {
+      "id": "gh_1bde9291d2e9",
+      "path": "audio/kiky/Aqui_tienes_Que_lo_d.wav",
+      "name": "Kíky · Aquí tienes. ¡Que lo disfrutes!",
+      "emoji": "🎵",
+      "bytes": 109484,
+      "local": true
+    },
+    {
+      "id": "gh_c49e825674b9",
+      "path": "audio/kiky/Hola deseas un Brown.wav",
+      "name": "Kíky · Hola deseas un Brown",
+      "emoji": "👋",
+      "bytes": 147884,
+      "local": true
+    },
+    {
+      "id": "gh_44d5207c6f77",
+      "path": "audio/kiky/Hola deseas un Cremo.wav",
+      "name": "Kíky · Hola deseas un Cremo",
+      "emoji": "👋",
+      "bytes": 165164,
+      "local": true
+    },
+    {
+      "id": "gh_f403977d81b3",
+      "path": "audio/kiky/Muchas graacias.wav",
+      "name": "Kíky · Muchas graacias",
+      "emoji": "🎵",
+      "bytes": 65324,
+      "local": true
+    },
+    {
+      "id": "gh_9e122d32b8e7",
+      "path": "audio/miau_miau.mp3",
+      "name": "miau miau",
+      "emoji": "🎵",
+      "bytes": 496463,
+      "local": true
+    },
+    {
+      "id": "gh_8eaf9c953f12",
+      "path": "audio/pedro_pedro.mp3",
+      "name": "pedro pedro",
+      "emoji": "🎵",
+      "bytes": 621165,
+      "local": true
+    },
+    {
+      "id": "gh_9ffe6156e16a",
+      "path": "audio/please_return_prod.wav",
+      "name": "Por favor, devuelve el producto a la bandeja",
+      "emoji": "📦",
+      "bytes": 155564,
+      "local": true
+    },
+    {
+      "id": "gh_7a9e26f87415",
+      "path": "audio/policy_siren.mp3",
+      "name": "policy siren",
+      "emoji": "🚨",
+      "bytes": 513024,
+      "local": true
+    },
+    {
+      "id": "gh_2a493f3f12a1",
+      "path": "audio/presentation.wav",
+      "name": "presentation",
+      "emoji": "🎵",
+      "bytes": 255404,
+      "local": true
+    },
+    {
+      "id": "gh_954b5c7b0080",
+      "path": "audio/product-pollo-kiky.wav",
+      "name": "¡Hola! ¿Se les antoja un sabroso pollo de Pollos Kiky para hoy? Pueden pedir aquí mismo.",
+      "emoji": "🍗",
+      "bytes": 289324,
+      "local": true
+    },
+    {
+      "id": "gh_ddf73bca3e18",
+      "path": "audio/product_kiky.wav",
+      "name": "Hola, ¿Deseas algún producto de Kiky?",
+      "emoji": "🍗",
+      "bytes": 131116,
+      "local": true
+    },
+    {
+      "id": "gh_4901e3cfae90",
+      "path": "audio/purchase_buy.wav",
+      "name": "Invitación a comprar",
+      "emoji": "🛍️",
+      "bytes": 1167510,
+      "local": true
+    },
+    {
+      "id": "gh_feb7a533e5ff",
+      "path": "audio/purchase_buy_dessert_kiky.wav",
+      "name": "Si me compras un postre de Kiky, te lo traigo enseguida",
+      "emoji": "🍗",
+      "bytes": 243884,
+      "local": true
+    },
+    {
+      "id": "gh_07044ff8d586",
+      "path": "audio/question_coffe.wav",
+      "name": "¿Hola, quieres un café?",
+      "emoji": "☕",
+      "bytes": 844950,
+      "local": true
+    },
+    {
+      "id": "gh_c3f310de1d56",
+      "path": "audio/reto_tokio.mp3",
+      "name": "reto tokio",
+      "emoji": "🎵",
+      "bytes": 502733,
+      "local": true
+    },
+    {
+      "id": "gh_0eb6dd3c17a8",
+      "path": "audio/select_button_to_pay.wav",
+      "name": "Puedes presionar el botón ",
+      "emoji": "🎵",
+      "bytes": 272684,
+      "local": true
+    },
+    {
+      "id": "gh_ad035522486a",
+      "path": "audio/six-seven.wav",
+      "name": "six seven",
+      "emoji": "🎵",
+      "bytes": 2527890,
+      "local": true
+    },
+    {
+      "id": "gh_6a801c412513",
+      "path": "audio/switch_product.wav",
+      "name": "Con un solo dedo puedes deslizar hacia la derecha o izquierda para cambiar de producto",
+      "emoji": "🎵",
+      "bytes": 313004,
+      "local": true
+    },
+    {
+      "id": "gh_0d59b505102a",
+      "path": "audio/thanks_good_bye.wav",
+      "name": "Muchas gracias, hasta luego",
+      "emoji": "🙏",
+      "bytes": 106540,
+      "local": true
+    },
+    {
+      "id": "gh_8038d1d7d79d",
+      "path": "audio/thanks_shopping.wav",
+      "name": "Gracias por tu compra",
+      "emoji": "🙏",
+      "bytes": 1413270,
+      "local": true
+    },
+    {
+      "id": "gh_d1103871078e",
+      "path": "audio/there_is_an_order.wav",
+      "name": "¡Orden recibida!",
+      "emoji": "🎵",
+      "bytes": 2227350,
+      "local": true
+    },
+    {
+      "id": "gh_727298965d34",
+      "path": "audio/there_is_an_order_2.mp3",
+      "name": "Tengo un pedido ¿Lo puedes revisar? son los que dicen Robot Mesero 2",
+      "emoji": "📦",
+      "bytes": 41328,
+      "local": true
+    },
+    {
+      "id": "gh_4efc26a3555c",
+      "path": "audio/there_is_an_order_3.wav",
+      "name": "Tengo un pedido ¿Lo puedes revisar? son los que dicen Robot Mesero 3",
+      "emoji": "📦",
+      "bytes": 267308,
+      "local": true
+    },
+    {
+      "id": "gh_8ebb04a40245",
+      "path": "audio/there_is_an_order_4.wav",
+      "name": "Tengo un pedido ¿Lo puedes revisar? son los que dicen Robot Mesero 4",
+      "emoji": "📦",
+      "bytes": 265260,
+      "local": true
+    }
+  ]
+}
