@@ -1,0 +1,24 @@
+{
+  "name": "Nexus Robotics · Panel Mesero 06",
+  "status": "web-authenticated hardware integration; physical robot not yet tested",
+  "files": 79,
+  "audio_files": 57,
+  "backend": "nexus_panel_app.py",
+  "socketio": "MESERO06_SOCKET_URL",
+  "flutter": "MESERO06_MINI_URL",
+  "tts": "MESERO06_TTS_URL",
+  "credentials": "environment only, not included",
+  "sha256": {
+    "ROBOT_LOCAL_06.html": "75bdea60762a0725958498a8001ec66e9229e2419907b3348c26b4a5c775c84f",
+    "ROBOT_LOCAL_06_CAMARAS.html": "7f7ae0fbd0191139fbf421d31ec83c8742a6d37d8b2343c7c0550e331a6dcca8",
+    "github_audio_catalog.json": "60ffbb3b7ee0d26812cb1f892ebb31b87195c548799c775c126490f9e84271d4",
+    "halloween_catalogo_publico.json": "fa2549c3b96c27633e3d060cb406ec5d13843ca5ed9304c947a053b15a62781c",
+    "mesero06_drive_bridge.py": "069de836490f9e6059df6e68c07596492e68ac27a1c027f8c14bbd9e4f0c7857",
+    "mesero06_repo_media.py": "ee4c1e07514231f982d14f8188952731e12a33eafed554ad49a2b9d5ccabdcb7",
+    "mesero06_server_audio.py": "779ce25f5c3d3929f38743976346c97676fab9cdc4aa145c662757b5bc2a140a",
+    "nexus_panel_app.py": "f701d5edade95a55e2e67db90f0fa99f7bc88992737064f4bf865ea46f5f089b",
+    "render_hls_proxy.py": "39b5c6675e877319624d9335696825f020d1548f49f833ad1253af942965bb58",
+    "robot_local_06.py": "38c9a8e5c86e5f707c69a1c8b29ff77d3414f88448c3cf942b25c51ddcdeef0e",
+    "tests/test_panel.py": "f02b41201dd8491766786f481ac569b34118d7d2891fbf292b2b8865f1c83381"
+  }
+}
