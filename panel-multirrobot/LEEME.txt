@@ -1,0 +1,86 @@
+PANEL ROBOT MULTIRROBOT - IP LIBRE - EDICION LOCAL CORREGIDA
+=============================================================
+
+1. Extrae TODO el ZIP a una carpeta nueva, sin mezclar archivos con versiones anteriores.
+2. Ejecuta INICIAR_PANEL_ROBOT.bat.
+3. Introduce la IP IPv4 del robot al iniciar (LAN o Tailscale). NO hay IP por defecto.
+4. Si Python 3.10+ no esta instalado, el iniciador ofrece instalar Python 3.12 con winget.
+5. El iniciador crea .venv e instala python-socketio[client] si falta.
+6. Comprueba TCP en 5000/5050/9000 y abre tu panel local en http://127.0.0.1:8765/.
+
+ESTE ES TU PANEL HTML ORIGINAL, no el panel administrativo FastAPI.
+El backend local usa los mismos servicios del robot elegido:
+  5000: Socket.IO y STM32 / control supervisado.
+  5050: Mini QR / caritas / audios / productos / comercios.
+  9000: TTS con token privado introducido en consola.
+  8888, 8889: camaras privadas cuando el robot las tiene.
+
+FUNCIONES MANTENIDAS
+- Halloween: catalogo original con URLs de Cloudinary; la app Flutter del
+  robot debe aceptar y mostrar los GIF externos. No arregla el error Flutter
+  GIF no encontrado en la nueva interfaz.
+- TTS: token solicitado por separado, no lo pegues en el repositorio.
+- Consultar STM32: consulta el estado sin tomar control.
+- Ver todos en el panel: solo cambia el listado local.
+- Ver todos los comercios en el robot: envia POST /merchants/show a Mini QR
+  (habilita los comercios y abre Elige restaurante con 2+ comercios visibles);
+  rechaza la operacion si hay un pago activo o no se puede confirmar su estado.
+- Comandos WASD y STOP del panel local original, sujetos a seguridad.
+
+SEGURIDAD
+- No publiques el puerto local 8765 en Internet.
+- Al iniciar no se toma el control fisico del robot ni se mueve.
+- Antes de WASD confirma la identidad del robot, STM32, modo, STOP y presencia
+  de un supervisor junto al equipo.
+- No almacena tokens en archivos del ZIP.
+- El catalogo externo de audios es opcional y debe llevar el robot correcto
+  en su parametro si es especifico de una unidad.
+- Usa siempre una carpeta nueva: el paquete anterior tenia un error al
+  detectar python-socketio ausente; esta version lo comprueba sin traceback.
+
+ARCHIVOS PRINCIPALES
+ INICIAR_PANEL_ROBOT.bat         : unico archivo a ejecutar.
+ iniciar_panel_robot.ps1         : selector IPv4 e instalador dependencias.
+ panel_robot_local.py           : backend local original, con IP variable.
+ PANEL_ROBOT_LOCAL.html         : interfaz original adaptada.
+ PANEL_ROBOT_CAMARAS.html       : visor de camaras adaptado.
+ robot_drive_bridge.py          : control STM32/Socket.IO original.
+ robot_server_audio.py          : catalogo opcional de audios de backend.
+ robot_repo_media.py            : catalogo de medios.
+ halloween_catalogo_publico.json, github_audio_catalog.json, audio_original/.
+
+ACTUALIZACION: CONSULTAR STM32 Y CAMBIO DE MODO
+- Consultar STM32: ahora espera una respuesta nueva de estado Socket.IO
+  y muestra enlace, STM32, modo y si hay telemetria reciente.
+- Cuando ya eres operador con control, solicita ademas MODE? (solo lectura).
+  No cambia modos ni mueve motores al consultar.
+- Si el robot no responde, muestra el error en lugar de datos antiguos.
+- Cambiar modo: se elimino la confirmacion emergente del navegador.
+  Se conservan la autorizacion real, STOP previo, bloqueo de WASD y
+  la espera de confirmacion desde el controlador.
+- La IP no determina automaticamente el nombre/nro de robot.
+  La interfaz usa el rotulo general ROBOT SELECCIONADO.
+- Probado con simulaciones de Socket.IO, no con el robot fisico.
+
+
+RECUPERACIÓN CUANDO EL MODO SALE DESCONOCIDO (multirrobot)
+--------------------------------------------------------
+- RC = mando físico tipo PlayStation; no es el control web WASD.
+- Si el enlace de red está caído, no es posible cambiar el modo: primero restablecer Tailscale/LAN y consultar STM32.
+- Consultar STM32 es de solo lectura y está disponible sin haber tomado el control.
+- Con el robot inmóvil y supervisado, pulsar TOMAR CONTROL y esperar a que STM32 confirme el enlace.
+- Si el modo sigue DESCONOCIDO, el botón RECUPERAR MODO permite UN ciclo manual cada vez. No hay ciclos automáticos.
+- Un ciclo genera STOP previo y solicita cycle_mode al controlador original. No asegura por sí solo qué modo resultará.
+- Si no se recibe un estado nuevo en 7 segundos, permite volver a consultar/reintentar manualmente; WASD permanece bloqueado.
+- Solo TELEDIRIGIDO confirmado, cámara/foco recientes y control exclusivo permiten movimiento.
+- No utilizar el cambio de modo como prueba cuando el robot está en una zona sin supervisión física.
+
+
+ACTUALIZACION: CARITAS, AVISO TTS Y REVISION DE COMERCIOS
+- Caritas: al asignar una categoria, ambos editores muestran la categoria destino.
+- TTS: aviso verde/rojo temporal sobre la camara, con frase enviada; el historial y consola externos se conservan.
+- No se modifico la API ni el motor de TTS.
+- Comercio + producto ID + audio: ahora usa el endpoint Flutter /operator/show-product
+  instalado y probado por SSH; el audio se solicita solo despues de pageReady=true.
+- Ver comercios en el ROBOT: usa /merchants/show (no provoca reload/attract adicional).
+- Ver REVISION_ERRORES_Y_FLUTTER.md para requisitos y diagnostico.

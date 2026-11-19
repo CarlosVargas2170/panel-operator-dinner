@@ -43,3 +43,49 @@ Una sesión de operador a la vez, sin liberación automática de control despué
 Para incorporar al portal `adminrobots.nexarobotics.org`, el equipo puede reutilizar la app FastAPI completa o llamar a sus rutas desde su backend oficial. Debe adaptar autenticación/roles, asegurar que el usuario tenga acceso permitido, y migrar las variables de entorno.
 
 **Audios y TTS:** un usuario autenticado puede utilizarlos sin tomar control de motores siempre que no exista otro operador activo. El control WASD sí exige Tomar control.
+
+---
+
+## PANEL ROBOT MULTIRROBOT - Nexus
+
+**Rama:** feat/panel-robot-multirrobot
+
+### Modificaciones realizadas
+
+Se incorporo una version del panel operador para controlar robots meseros mediante su IP local o Tailscale.
+
+Las principales funciones de esta version son:
+
+- Control WASD, STOP y modos de operacion.
+- Visualizacion de camaras y funciones TTS.
+- Gestion de caritas, audios y comercios.
+- Seleccion de comercio y producto mediante su ID unico.
+- Integracion del boton Ofrecer con el endpoint POST /operator/show-product de Mini QR.
+- Apertura del selector de comercios mediante POST /merchants/show.
+- Atajos personalizables para pilotos.
+- Conservacion de las funciones originales del panel.
+
+### Seleccion directa de productos
+
+El panel puede solicitar que Mini QR abra el catalogo de un comercio directamente en la pagina del producto seleccionado.
+
+Ejemplo:
+
+POST /operator/show-product
+
+{"merchantId":84,"productId":455}
+
+El cliente puede continuar navegando por los demas productos y realizar una compra normalmente.
+
+Esta funcion requiere una version de Mini QR que implemente el endpoint indicado.
+
+### Alcance
+
+Los cambios corresponden al panel operador y su integracion con Mini QR. No se modifican los controles fisicos STM32 ni la logica interna de pagos.
+
+Las funciones deben verificarse en cada robot compatible antes de su uso operativo.
+
+### Autor
+
+Atte. Alex
+

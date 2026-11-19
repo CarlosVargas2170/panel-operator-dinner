@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>robot seleccionado · Dos cámaras</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:#090f1b;color:#e9f2fd}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(135deg,#0e1a2a,#080d17)}
+header{max-width:1600px;margin:auto;padding:20px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{margin:2px 0;font-size:clamp(22px,2.4vw,33px)}.eyebrow{font-weight:800;font-size:11px;letter-spacing:.14em;color:#8be2d8;text-transform:uppercase}.sub{color:#acbed0;font-size:12px;margin:5px 0 0}
+.badge{padding:10px 13px;border:1px solid #465d77;background:#14253a;border-radius:99px;font-size:12px;font-weight:800;color:#c2d8ed}.badge[data-state=online]{color:#a0f0cc;border-color:#3c977f}.badge[data-state=offline]{color:#ffb8bd;border-color:#ad636d}
+main{max-width:1600px;margin:auto;padding:0 20px 25px}.controls{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:14px}button,a.link{border:1px solid #375474;border-radius:11px;padding:11px 14px;background:#162842;color:#e4f1ff;font:inherit;font-size:13px;font-weight:750;cursor:pointer;text-decoration:none}button:hover,a.link:hover{background:#264363}.primary{background:#2b665f;border-color:#3b8a7b}select{border:1px solid #3a5875;border-radius:8px;background:#0f1d2d;color:#e4f1ff;padding:7px 9px}label{font-size:12px;color:#b6cde1;font-weight:700}.audiobox{display:inline-flex;align-items:center;gap:9px;padding:0 5px}input[type=range]{accent-color:#80d9cd;width:110px}
+#cameras{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}article{min-width:0;background:#0a101b;border:1px solid #283e56;border-radius:16px;overflow:hidden}.cam-head{padding:11px 14px;background:#122037;display:flex;justify-content:space-between;align-items:center;gap:10px}.cam-head strong{font-size:13px}.cam-head span{font-size:11px;color:#8faec8}.frame{aspect-ratio:16/9;background:#060a10;position:relative}.frame canvas{display:block;width:100%;height:100%;object-fit:contain}.placeholder{position:absolute;inset:0;display:grid;place-items:center;color:#7896b6;background:#070d17;font-size:13px}.placeholder[hidden]{display:none}.frame video{display:none}
+.note{margin-top:12px;padding:12px 15px;border:1px solid #2d435d;background:#111c2e;border-radius:13px;font-size:12px;line-height:1.6;color:#a9c1da}.note code{color:#c8eeef}#cameras:fullscreen{padding:16px;background:#080d16;align-items:center}#cameras:fullscreen article{width:100%}@media(max-width:700px){#cameras{grid-template-columns:1fr}header{padding:16px}main{padding:0 12px 16px}}
+</style>
+</head>
+<body>
+<header><div><div class="eyebrow">Nexus Robotics · Tailscale directo</div><h1>Robot robot seleccionado · Cámaras</h1><p class="sub">Dos vistas seleccionables del video compuesto · Sin conexión con los motores</p></div><span id="status" class="badge" data-state="pending">Sin conectar</span></header>
+<main>
+ <div class="controls">
+  <button id="connect" class="primary" type="button">Conectar cámaras</button>
+  <button id="disconnect" type="button">Desconectar</button>
+  <button id="fullscreen" type="button">Ver cámaras completas</button>
+  <a class="link" id="original" href="http://__ROBOT_IP__:8889/camaras/" target="_blank" rel="noopener noreferrer">Visor original de 4 cámaras</a>
+  <span class="audiobox"><button id="mute" type="button" aria-pressed="true">🔇 Micrófono silenciado</button><label>Volumen <input id="volume" type="range" min="0" max="100" value="50" aria-label="Volumen del micrófono"></label></span>
+ </div>
+ <section id="cameras" aria-label="Visor doble del robot seleccionado">
+  <article><div class="cam-head"><strong>Vista A</strong><label>Mostrar <select id="selectA" aria-label="Seleccionar cámara de la vista A"><option value="0">Cámara 1</option><option value="1">Cámara 2</option><option value="2">Cámara 3</option><option value="3">Cámara 4</option></select></label></div><div class="frame"><canvas id="canvasA" width="640" height="360" aria-label="Cámara A"></canvas><div class="placeholder" id="emptyA">Sin imagen</div></div></article>
+  <article><div class="cam-head"><strong>Vista B</strong><label>Mostrar <select id="selectB" aria-label="Seleccionar cámara de la vista B"><option value="0">Cámara 1</option><option value="1" selected>Cámara 2</option><option value="2">Cámara 3</option><option value="3">Cámara 4</option></select></label></div><div class="frame"><canvas id="canvasB" width="640" height="360" aria-label="Cámara B"></canvas><div class="placeholder" id="emptyB">Sin imagen</div></div></article>
+ </section>
+ <video id="source" autoplay muted playsinline aria-hidden="true"></video>
+ <div class="note" id="details">La página se conecta solo al stream <code>camaras</code> existente por la IP Tailscale. Extrae dos cuadrantes del único video de cuatro cámaras, sin pedir dos streams adicionales. El audio inicia silenciado. Si la imagen se congela, intenta reconectar. <strong>No autoriza conducción remota.</strong></div>
+</main>
+<script>
+(() => {
+ 'use strict';
+ const el=id=>document.getElementById(id);const video=el('source');const canvases=[el('canvasA'),el('canvasB')];const placeholders=[el('emptyA'),el('emptyB')];const status=el('status');
+ const host='__ROBOT_IP__';const url='http://'+host+':8889/camaras/whep';el('original').href='http://'+host+':8889/camaras/';
+ let pc=null,attempt=0,token=0,started=false,live=false,lastFrame=0,connecting=false,retry=null,watch=null,renderLoop=null,stopped=false,muted=true;
+ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ const badge=(state,msg)=>{status.dataset.state=state;status.textContent=msg;};
+ const showFrames=(visible)=>placeholders.forEach(e=>e.hidden=visible);
+ const clearFrames=()=>{showFrames(false);canvases.forEach(c=>c.getContext('2d').clearRect(0,0,c.width,c.height));};
+ const close=()=>{if(pc){try{pc.close();}catch(_){ }pc=null;}try{video.pause();video.srcObject=null;}catch(_){}live=false;};
+ const draw=()=>{
+   if(!live || video.videoWidth<2 || video.videoHeight<2)return;
+   const w=video.videoWidth/2,h=video.videoHeight/2;
+   [Number(el('selectA').value),Number(el('selectB').value)].forEach((n,i)=>{
+     const c=canvases[i];const ctx=c.getContext('2d',{alpha:false});
+     try{ctx.drawImage(video,(n%2)*w,Math.floor(n/2)*h,w,h,0,0,c.width,c.height);}catch(_){ }
+   });
+   lastFrame=performance.now();showFrames(true);
+ };
+ const loopVideo=()=>{if(!live)return;if('requestVideoFrameCallback' in video){const f=()=>{if(!live)return;draw();video.requestVideoFrameCallback(f)};video.requestVideoFrameCallback(f);}else{const fallback=()=>{if(!live)return;draw();renderLoop=requestAnimationFrame(fallback)};renderLoop=requestAnimationFrame(fallback)}};
+ const iceWait=peer=>new Promise(resolve=>{if(peer.iceGatheringState==='complete'){resolve();return;}const done=()=>{if(peer.iceGatheringState==='complete'){peer.removeEventListener('icegatheringstatechange',done);resolve()}};peer.addEventListener('icegatheringstatechange',done);setTimeout(()=>{peer.removeEventListener('icegatheringstatechange',done);resolve()},3500)});
+ const tryConnect=async () => {
+   if(connecting||stopped)return;connecting=true;const id=++token;close();clearFrames();badge('pending','Conectando WebRTC…');
+   try{
+     if(!window.RTCPeerConnection)throw Error('El navegador no admite WebRTC');
+     const peer=new RTCPeerConnection({iceServers:[]});pc=peer;
+     peer.addTransceiver('video',{direction:'recvonly'});peer.addTransceiver('audio',{direction:'recvonly'});
+     const stream=new MediaStream();
+     peer.ontrack=e=>{if(id!==token)return;stream.addTrack(e.track);video.srcObject=stream;video.muted=muted;video.volume=Number(el('volume').value)/100;video.play().catch(()=>{});};
+     const offer=await peer.createOffer();await peer.setLocalDescription(offer);await iceWait(peer);
+     const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),7000);
+     let response;try{response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},body:peer.localDescription.sdp,cache:'no-store',signal:controller.signal})}finally{clearTimeout(timeout)}
+     if(!response.ok)throw Error('WHEP respondió '+response.status);
+     await peer.setRemoteDescription({type:'answer',sdp:await response.text()});
+     const began=performance.now();while(id===token && performance.now()-began<7000 && (!video.videoWidth||video.readyState<2)){await sleep(200)}
+     if(id!==token)return;if(!video.videoWidth)throw Error('El video no entregó fotogramas');
+     attempt=0;live=true;lastFrame=performance.now();loopVideo();draw();badge('online','Cámaras conectadas');
+   }catch(e){if(id===token){close();clearFrames();badge('offline','Sin señal · reintentando');el('details').textContent='No se pudo recibir video: '+(e.message||e)+'. Comprobá Tailscale y el visor original. El sistema intentará reconectar automáticamente.';schedule();}}
+   finally{connecting=false;}
+ };
+ const schedule=()=>{if(stopped||retry)return;const ms=Math.min(12000,1000*Math.pow(2,Math.min(attempt++,4)));retry=setTimeout(()=>{retry=null;if(!document.hidden)tryConnect();else schedule()},ms)};
+ const reconnect=(reason)=>{if(stopped||connecting)return;badge('offline',reason);close();clearFrames();schedule();};
+ const stop=()=>{stopped=true;token++;if(retry){clearTimeout(retry);retry=null;}cancelAnimationFrame(renderLoop);close();clearFrames();badge('pending','Desconectado');};
+ el('connect').onclick=()=>{stopped=false;attempt=0;if(retry){clearTimeout(retry);retry=null;}tryConnect()};
+ el('disconnect').onclick=stop;
+ el('fullscreen').onclick=()=>{const area=el('cameras');if(document.fullscreenElement)document.exitFullscreen();else area.requestFullscreen?.();};
+ el('mute').onclick=()=>{muted=!muted;video.muted=muted;const btn=el('mute');btn.textContent=muted?'🔇 Micrófono silenciado':'🔊 Micrófono activado';btn.setAttribute('aria-pressed',String(muted));};
+ el('volume').oninput=e=>{video.volume=Number(e.target.value)/100};
+ watch=setInterval(()=>{if(stopped||document.hidden)return;if(live&&performance.now()-lastFrame>4000)reconnect('Video congelado · reconectando')},1000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!stopped&&!connecting&&!live)tryConnect()});
+ window.addEventListener('beforeunload',()=>{stop();clearInterval(watch)});
+ tryConnect();
+})();
+</script>
+</body>
+</html>

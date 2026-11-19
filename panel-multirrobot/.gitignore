@@ -1,0 +1,18 @@
+# Local operator-only credentials and cache
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+*.log
+*.har
+*.tmp
+.DS_Store
+.vscode/
+*_config_local.json
+*token*
+*secret*
+
+.venv/
+.env
