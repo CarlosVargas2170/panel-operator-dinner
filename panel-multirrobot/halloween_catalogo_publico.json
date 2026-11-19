@@ -1,0 +1,67 @@
+{
+  "source": "public.emotions (exportación de solo lectura del operador)",
+  "catalog_kind": "snapshot",
+  "robot_verified": false,
+  "faces": [
+    {
+      "code": "calabaza_zksw",
+      "label": "Calabaza",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791317639/robotics/emotions/calabaza_zksw-093cd48e.gif",
+      "emoji": "🎃"
+    },
+    {
+      "code": "alien_cb5e",
+      "label": "Alien",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791318086/robotics/emotions/alien_cb5e-faeb9ef9.gif",
+      "emoji": "👽"
+    },
+    {
+      "code": "fantasma_e2ah",
+      "label": "Fantasma",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791318161/robotics/emotions/fantasma_e2ah-82acf5e8.gif",
+      "emoji": "👻"
+    },
+    {
+      "code": "bruja_w8g4",
+      "label": "Bruja",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791318118/robotics/emotions/bruja_w8g4-a28f8fcb.gif",
+      "emoji": "🧙"
+    },
+    {
+      "code": "bruja_hem9",
+      "label": "Bruja 2",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791320737/robotics/emotions/bruja_hem9-45bec4f5.gif",
+      "emoji": "🧙"
+    },
+    {
+      "code": "alien_qfau",
+      "label": "Alien 2",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791580104/robotics/emotions/alien_qfau-fa83bf29.gif",
+      "emoji": "👽"
+    },
+    {
+      "code": "calabaza_6d9b",
+      "label": "Calabaza 2",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791580306/robotics/emotions/calabaza_6d9b-0da4594e.gif",
+      "emoji": "🎃"
+    },
+    {
+      "code": "normal_demon_uhj1",
+      "label": "Normal Demon",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791580366/robotics/emotions/normal_demon_uhj1-0fedeb38.gif",
+      "emoji": "😈"
+    },
+    {
+      "code": "dinero_demon_d34j",
+      "label": "Dinero Demon",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791584414/robotics/emotions/dinero_demon_d34j-581b3584.gif",
+      "emoji": "🤑"
+    },
+    {
+      "code": "enamorado_demon_ca6w",
+      "label": "Enamorado Demon",
+      "gif_url": "https://res.cloudinary.com/zrwcfuqw/image/upload/v1791584450/robotics/emotions/enamorado_demon_ca6w-8f6dfaa0.gif",
+      "emoji": "😍"
+    }
+  ]
+}

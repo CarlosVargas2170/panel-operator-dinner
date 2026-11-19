@@ -1,0 +1,75 @@
+PANEL ROBOT MULTIRROBOT - INTEGRACION CON MINI QR (2026-11-19)
+================================================================
+
+NUEVO EN ESTE PAQUETE
+- Se mantienen TODOS los archivos del ZIP original del usuario.
+- El boton de producto del piloto ofrece ahora dos acciones:
+  * Ofrecer (+audio si tiene uno asignado): envia IDs exactos al robot y
+    solicita el audio SOLO cuando Flutter confirma pageReady=true.
+  * Mostrar sin audio: mismo producto, sin sonido (ideal para la primera prueba).
+- El boton de todos los comercios del ROBOT usa /merchants/show directamente.
+  No confundirlo con 'Ver todos en el panel', que sigue siendo vista local.
+- Puedes guardar una letra libre por producto para ejecutarlo como atajo.
+- El audio es OPCIONAL. Los botones antiguos mantienen su audio/ID/ediciones.
+- El producto elegido es una PAGINA del carrusel, nunca un filtro que oculte
+  otros productos. El cliente puede desplazarse y comprar normalmente.
+
+REQUISITOS
+- Robot accesible por Tailscale/LAN.
+- Mini QR actualizada previamente en ese robot con:
+    POST http://IP_DEL_ROBOT:5050/operator/show-product
+  Esta funcion ya se probo en el robot Mesero 06 con 53/74 y 84/455.
+- Para ver el selector de comercios se requiere que Mini QR tenga al menos
+  dos comercios con productos visibles (POST /merchants/show).
+- No se modifica ni recompila Mini QR con ESTE ZIP. Solo cambia el panel
+  local Windows y su puente al puerto 5050.
+
+PRIMERA PRUEBA RECOMENDADA (SIN AUDIO)
+1. Guarda la carpeta del panel que ya usas como respaldo, sin borrarla.
+2. DESCOMPRIME este ZIP COMPLETO en una CARPETA NUEVA en Windows.
+3. Cierra el panel anterior (Ctrl+C en su consola) para liberar el puerto 8765.
+4. Ejecuta INICIAR_PANEL_ROBOT.bat; introduce la IP real del robot.
+5. En 'Botones de productos' crea uno llamado Soda HAVANNA, ID 455,
+   audio 'Sin audio por ahora' (el comercio se detecta del catalogo).
+6. Pulsa 'Mostrar sin audio'. La pantalla del robot debe abrir HAVANNA en la
+   pagina donde esta SODA, con el resto del catalogo navegable.
+7. En 'Comercios de Flutter' pulsa 'Ver todos los comercios en el robot'.
+   Debe abrir 'Elige restaurante' si existen dos o mas comercios con productos.
+8. Para probar audio, edita el boton, asigna un audio del inventario y pulsa
+   'Ofrecer + audio'. El audio se solicita despues de que Flutter confirme pagina.
+9. Para asignar tecla al boton, pulsa 'Atajo' y presiona una letra no ocupada.
+
+SI FALLA
+- NO toques el ejecutable Flutter ni reinicies servicios del robot.
+- Cierra esta version del panel y vuelve a ejecutar la carpeta anterior.
+- Guarda el mensaje visible en 'Botones de productos' o 'Comercios de Flutter'.
+- Si una seleccion anterior dejo el comercio DESHABILITADO por filtro,
+  pulsa primero 'Ver todos los comercios en el robot' y vuelve a ofrecer.
+- Si hay carrito/pago activo, Flutter puede rechazar la presentacion: no forzar.
+- Si el audio no se reproduce, el producto no se pierde: revisa salida
+  'Solo robot / Solo PC / Ambos' y el audio del inventario.
+
+COMPATIBILIDAD
+- No se cambian archivos de control STM32/WASD, TTS, camaras, Python de
+  arranque, catalogos ni archivos WAV/MP3.
+- La carita Halloween pendiente de migracion en Mini QR no se arregla aqui.
+- Los botones antiguos se guardan en localStorage del navegador por piloto.
+  Al abrir desde http://127.0.0.1:8765/ se conserva el mismo almacenamiento
+  si sigues usando el mismo navegador/perfil de Windows.
+- La nueva API del panel local es:
+    POST /api/mini/operator/show-product con {merchantId,productId}
+  Requiere origen local y la credencial CSRF ya gestionada por el BAT.
+- La operacion 'Ver todos' del robot usa:
+    POST /api/mini/merchants/all  -> POST /merchants/show en Flutter.
+
+VALIDACION LOCAL PREVIA AL ZIP
+- Compilacion de panel_robot_local.py: OK.
+- Sintaxis de los seis bloques JavaScript incrustados: OK (node --check).
+- Ocho pruebas de rutas Python con Mini QR simulada: OK.
+- La prueba end-to-end Windows + robot fisico corresponde al usuario,
+  no se ha ejecutado de manera remota desde ChatGPT.
+
+PUBLICACION GITHUB
+- Este paquete NO se ha subido a GitHub.
+- El parche de Dart que esta en Mini QR requiere una rama separada/PR
+  para que los desarrolladores conserven /operator/show-product.
