@@ -1,0 +1,1197 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
+import '../config/app_settings.dart';
+import '../config/product_filter_config.dart';
+import 'audio_service.dart';
+import 'media_cache.dart';
+import 'payment_counter.dart';
+import 'payment_polling_status.dart';
+import 'product_cache.dart';
+import 'ui_command_bus.dart';
+
+/// Servidor HTTP unificado de la aplicacion.
+///
+/// Expone todos los endpoints de la app en un solo puerto:
+/// --- Audio ---
+/// - `POST /audio/play`     -> Reproduce cualquier asset de audio (body: {"asset": "audio/foo.wav"})
+/// - `POST /audio/stop`     -> Detiene el audio actual
+/// - `POST /play-audio`     -> Reproduce audio por query param (ej: ?asset=audio/foo.wav&volume=1.0)
+/// - `POST /play-question`  -> Reproduce audio de pregunta (legacy)
+/// - `POST /play-thanks`    -> Reproduce audio de agradecimiento (legacy)
+/// - `POST /play-buy`       -> Reproduce audio de compra (legacy)
+/// - `POST /play-order`     -> Reproduce audio de orden recibida
+/// - `POST /play-attention` -> Reproduce audio de atencion / disculpa
+/// - `POST /play-collect-tray` -> Reproduce audio de cobrar bandeja
+/// - `POST /play-coffee`       -> Reproduce audio "aqui esta tu cafe"
+/// --- Robot / UI ---
+/// - `POST /proximity/near` -> Muestra video de atraccion
+/// - `POST /greet`          -> Muestra producto + reproduce saludo
+/// - `POST /greet/audio`    -> Muestra producto + reproduce el asset indicado
+/// - `POST /product`        -> Muestra solo el producto
+/// - `POST /operator/show-product` -> Abre pagina de producto por ID y comercio
+/// - `POST /proximity/away` -> Vuelve a reposo
+/// - `POST /carrusel/product` -> Idéntico a /proximity/near
+/// --- Attract GIF ---
+/// - `POST /attract/set`    -> Cambia el GIF de atraccion (body: {"gif": "nombre"})
+/// - `GET  /attract/current` -> Devuelve el nombre del GIF actual
+/// --- Pago QR (home) ---
+/// - `POST /payment/start-polling` -> Activa polling del QR visible en home
+/// - `POST /payment/stop-polling`  -> Detiene polling sin cancelar la orden
+/// - `GET  /payment/polling-status` -> Estado actual del polling (remote-control)
+/// --- Config ---
+/// - `GET  /config`         -> Lee configuracion actual
+/// - `POST /config`         -> Guarda nueva configuracion
+/// --- Merchants ---
+/// - `GET  /merchants`      -> Merchants configurados y los que cargaron
+/// - `POST /merchants`      -> Reemplaza la lista y recarga el catálogo
+///                             (body: {"merchantIds": [53, 54, 90]})
+/// - `POST /merchants/show` -> Habilita todos los merchants y muestra
+///                             "Elige restaurante" (sesion nueva)
+class AppServer {
+  HttpServer? _server;
+  final int port;
+  // AppServer({this.port = 8080});
+  AppServer({this.port = 5050});
+
+  Future<void> start() async {
+    try {
+      final host = AppSettings().baseUrlVpn;
+      debugPrint('[AppServer] Iniciando servidor en $host:$port ...');
+      final addr = InternetAddress.tryParse(host) ?? InternetAddress.anyIPv4;
+      debugPrint('[AppServer] Resolviendo direccion: $addr');
+      // _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+      _server = await HttpServer.bind(addr, AppSettings().portVpn);
+      debugPrint('[AppServer] Servidor iniciado en $_server');
+      final actualPort = AppSettings().portVpn;
+      debugPrint('[AppServer] Servidor iniciado en http://$addr:$actualPort');
+
+      // if (kDebugMode) {
+      //   debugPrint('[AppServer] Servidor iniciado en http://$addr:$actualPort');
+      // }
+
+      await for (final request in _server!) {
+        _handleRequest(request);
+      }
+    } on SocketException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[AppServer] No se pudo iniciar el servidor: $e');
+      }
+    }
+  }
+
+  void _handleRequest(HttpRequest request) async {
+    final response = request.response;
+    final path = request.uri.path;
+    final method = request.method;
+
+    // Log de todas las peticiones que llegan
+    debugPrint('[AppServer] ${request.method} ${request.uri}');
+
+    // CORS permisivo para funcionar con ngrok, navegadores, PWA, etc.
+    response.headers.add('Access-Control-Allow-Origin', '*');
+    response.headers.add('Access-Control-Allow-Methods',
+        'GET, POST, OPTIONS, PUT, DELETE, PATCH');
+    response.headers.add('Access-Control-Allow-Headers',
+        'Origin, Content-Type, Accept, Authorization, X-Requested-With');
+    response.headers
+        .add('Access-Control-Max-Age', '86400'); // Cache preflight 24h
+
+    if (method == 'OPTIONS') {
+      response.statusCode = HttpStatus.noContent;
+      await response.close();
+      return;
+    }
+
+    response.headers.contentType = ContentType.json;
+
+    // --- Audio endpoints ---
+    if (path == '/audio/play' && method == 'POST') {
+      await _handlePlayAudio(request, response);
+      return;
+    }
+
+    if (path == '/audio/stop' && method == 'POST') {
+      await AudioService.stop();
+      _sendJson(response, 200, {'success': true, 'message': 'Audio detenido'});
+      return;
+    }
+
+    // NUEVO: endpoint simple por query param (facil de probar desde navegador)
+    if (path == '/play-audio' && method == 'POST') {
+      final params = request.uri.queryParameters;
+      final asset = params['asset'];
+      final volume = double.tryParse(params['volume'] ?? '1.0') ?? 1.0;
+      final force = params['force'] == 'true';
+
+      if (asset == null || asset.isEmpty) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'Falta parametro ?asset=audio/foo.wav',
+        });
+        return;
+      }
+
+      // Audio remoto: validar y descargar en caché antes de reproducir.
+      // Los audios locales siguen funcionando sin cambio de ruta.
+      String? localFilePath;
+      if (asset.startsWith('https://') || asset.startsWith('http://')) {
+        try {
+          final file = await MediaCache.instance.fetch(asset, MediaKind.audio);
+          localFilePath = file.path;
+        } on MediaCacheException catch (error) {
+          _sendJson(response, error.invalidUrl ? 400 : 502, {
+            'success': false,
+            'message': error.message,
+          });
+          return;
+        } catch (error) {
+          debugPrint('[AppServer] Error descargando audio remoto: $error');
+          _sendJson(response, 502, {
+            'success': false,
+            'message': 'No se pudo descargar el audio remoto',
+          });
+          return;
+        }
+      }
+
+      AudioService.setRemoteCall(true);
+
+      // displayText opcional vía query param (?displayText=Hola)
+      final displayText = params['displayText'];
+      final played = await AudioService.play(
+        asset,
+        volume: volume,
+        force: force,
+        displayText: displayText,
+        localFilePath: localFilePath,
+      );
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'asset': asset,
+        'displayText': displayText,
+        'message': played
+            ? 'Reproduciendo "$asset"'
+            : 'Cooldown activo, audio omitido',
+      });
+      return;
+    }
+
+    if (path == '/play-question' && method == 'POST') {
+      UiCommandBus.emit(const ShowProductResetCarousel());
+
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playQuestion();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'message': played
+            ? 'Reproduciendo audio de pregunta + mostrando producto'
+            : 'Mostrando producto (audio omitido por cooldown)',
+      });
+      return;
+    }
+
+    if (path == '/play-thanks' && method == 'POST') {
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playThanks();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'message': played
+            ? 'Reproduciendo audio de agradecimiento'
+            : 'Cooldown activo, audio omitido',
+      });
+      return;
+    }
+
+    if (path == '/play-buy' && method == 'POST') {
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playBuy();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'message': played
+            ? 'Reproduciendo audio de compra'
+            : 'Cooldown activo, audio omitido',
+      });
+      return;
+    }
+
+    if (path == '/play-order' && method == 'POST') {
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playThereIsAnOrder();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'message': played
+            ? 'Reproduciendo audio de orden recibida'
+            : 'Cooldown activo, audio omitido',
+      });
+      return;
+    }
+
+    if (path == '/play-attention' && method == 'POST') {
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playAttentionExcuseMe();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'message': played
+            ? 'Reproduciendo audio de atencion'
+            : 'Cooldown activo, audio omitido',
+      });
+      return;
+    }
+
+    if (path == '/play-collect-tray' && method == 'POST') {
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playCollectTray();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'message': played
+            ? 'Reproduciendo audio de cobrar bandeja'
+            : 'Cooldown activo, audio omitido',
+      });
+      return;
+    }
+
+    if (path == '/play-coffee' && method == 'POST') {
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playHereIsCoffee();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'message': played
+            ? 'Reproduciendo audio aqui esta tu cafe'
+            : 'Cooldown activo, audio omitido',
+      });
+      return;
+    }
+
+    // --- Robot / Proximity endpoints ---
+    if (path == '/proximity/near' && method == 'POST') {
+      UiCommandBus.emit(const ShowAttract());
+      _sendJson(response, 200, {
+        'success': true,
+        'mode': 'attract',
+        'message': 'Mostrando video de atraccion'
+      });
+      return;
+    }
+
+    if (path == '/greet' && method == 'POST') {
+      UiCommandBus.emit(const ShowProductResetCarousel());
+
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.playQuestion();
+
+      _sendJson(response, 200, {
+        'success': true,
+        'mode': 'product',
+        'audio': played,
+        'message': played
+            ? 'Mostrando producto y reproduciendo saludo'
+            : 'Mostrando producto (audio omitido por cooldown)',
+      });
+      return;
+    }
+
+    if (path == '/greet/audio' && method == 'POST') {
+      final asset = normalizeAudioAssetPath(
+        request.uri.queryParameters['asset'],
+      );
+      if (asset == null) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'Falta un asset válido. Usa ?asset=audio/nombre.wav',
+        });
+        return;
+      }
+
+      try {
+        await rootBundle.load('assets/$asset');
+      } catch (_) {
+        _sendJson(response, 404, {
+          'success': false,
+          'asset': asset,
+          'message': 'El audio no existe en assets/audio/',
+        });
+        return;
+      }
+
+      final params = request.uri.queryParameters;
+      final force = params['force'] == 'true';
+      final displayText = params['displayText'];
+      final showOverlay = params['showOverlay'] != 'false';
+
+      UiCommandBus.emit(const ShowProductResetCarousel());
+      AudioService.setRemoteCall(true);
+      final played = await AudioService.play(
+        asset,
+        force: force,
+        displayText: displayText,
+        showOverlay: showOverlay,
+      );
+
+      _sendJson(response, 200, {
+        'success': true,
+        'mode': 'product',
+        'audio': played,
+        'asset': asset,
+        'message': played
+            ? 'Mostrando producto y reproduciendo "$asset"'
+            : 'Mostrando producto (audio omitido por cooldown)',
+      });
+      return;
+    }
+
+    if (path == '/product' && method == 'POST') {
+      UiCommandBus.emit(const ShowProduct());
+      _sendJson(response, 200, {
+        'success': true,
+        'mode': 'product',
+        'audio': false,
+        'message': 'Mostrando solo el producto'
+      });
+      return;
+    }
+
+    if (path == '/cancel-payment' && method == 'POST') {
+      UiCommandBus.emit(const CancelPayment());
+      _sendJson(response, 200, {
+        'success': true,
+        'message': 'Pago cancelado, volviendo al producto'
+      });
+      return;
+    }
+
+    // --- Payment polling (manual, operador) ---
+    if (path == '/payment/start-polling' && method == 'POST') {
+      UiCommandBus.emit(const StartPaymentPolling());
+      _sendJson(response, 200, {
+        'success': true,
+        'message': 'Polling de pago activado en el producto visible de la home',
+      });
+      return;
+    }
+
+    if (path == '/payment/stop-polling' && method == 'POST') {
+      UiCommandBus.emit(const StopPaymentPolling());
+      _sendJson(response, 200, {
+        'success': true,
+        'message': 'Polling de pago detenido',
+      });
+      return;
+    }
+
+    if (path == '/payment/polling-status' && method == 'GET') {
+      _sendJson(response, 200, PaymentPollingStatus().toJson());
+      return;
+    }
+
+    if (path == '/payment/reset-counter' && method == 'POST') {
+      PaymentCounter().reset();
+      _sendJson(response, 200, {
+        'success': true,
+        'message': 'Contador de ventas reiniciado',
+        'counter': PaymentCounter().toJson(),
+      });
+      return;
+    }
+
+    if (path == '/proximity/away' && method == 'POST') {
+      UiCommandBus.emit(const ShowIdle());
+      _sendJson(response, 200,
+          {'success': true, 'mode': 'idle', 'message': 'Volviendo a reposo'});
+      return;
+    }
+
+    if (path == '/carrusel/product' && method == 'POST') {
+      UiCommandBus.emit(const ShowAttract());
+      _sendJson(response, 200, {
+        'success': true,
+        'mode': 'attract',
+        'message': 'Mostrando video de atraccion'
+      });
+      return;
+    }
+
+    // --- Operador: presentar producto por ID, sin tocar filtros ni carrito ---
+    if (path == '/operator/show-product' && method == 'POST') {
+      await _handleOperatorShowProduct(request, response);
+      return;
+    }
+
+    // --- Config endpoints ---
+    if (path == '/config') {
+      if (method == 'GET') {
+        await _handleGetConfig(response);
+        return;
+      }
+      if (method == 'POST') {
+        await _handlePostConfig(request, response);
+        return;
+      }
+    }
+
+    // --- Merchants ---
+    if (path == '/merchants') {
+      if (method == 'GET') {
+        _sendJson(response, 200, {
+          'success': true,
+          'data': buildMerchantsData(AppSettings(), ProductCache()),
+        });
+        return;
+      }
+      if (method == 'POST' || method == 'PUT') {
+        await _handleSetMerchants(request, response);
+        return;
+      }
+    }
+
+    if (path == '/merchants/show' && method == 'POST') {
+      _handleShowMerchants(response);
+      return;
+    }
+
+    // --- Product filter endpoints ---
+    if (path == '/products' && method == 'GET') {
+      await _handleGetProducts(response);
+      return;
+    }
+
+    if (path == '/products/filter' && method == 'POST') {
+      await _handlePostProductsFilter(request, response);
+      return;
+    }
+
+    if (path == '/products/reload' && method == 'POST') {
+      await _handlePostProductsReload(response);
+      return;
+    }
+
+    // --- Product polling endpoints ---
+    if (path == '/products/polling/force' && method == 'POST') {
+      await _handleForceProductPoll(response);
+      return;
+    }
+
+    if (path == '/products/polling/status' && method == 'GET') {
+      await _handleGetProductPollingStatus(response);
+      return;
+    }
+
+    // --- Attract GIF endpoints ---
+    if (path == '/attract/set' && method == 'POST') {
+      await _handleSetAttractGif(request, response);
+      return;
+    }
+
+    if (path == '/attract/current' && method == 'GET') {
+      final gifName = UiCommandBus.currentGifName;
+      final gifUrl = UiCommandBus.currentGifUrl;
+      _sendJson(response, 200, {
+        'success': true,
+        'gif': gifName,
+        'assetPath': gifUrl == null ? 'assets/images/$gifName.gif' : null,
+        if (gifUrl != null) 'url': gifUrl,
+      });
+      return;
+    }
+
+    // --- 404 ---
+    _sendJson(
+        response, 404, {'success': false, 'message': 'Endpoint no encontrado'});
+  }
+
+  /// Seleccion visual por comercio+producto para atajos del panel.
+  /// No reproduce audio: el panel lo inicia tras recibir pageReady=true.
+  Future<void> _handleOperatorShowProduct(
+      HttpRequest request, HttpResponse response) async {
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      final data = jsonDecode(body);
+      if (data is! Map<String, dynamic> ||
+          data['merchantId'] is! int ||
+          data['productId'] is! int ||
+          data['merchantId'] <= 0 ||
+          data['productId'] <= 0) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'Se requieren merchantId y productId enteros positivos',
+        });
+        return;
+      }
+      final merchantId = data['merchantId'] as int;
+      final productId = data['productId'] as int;
+      final cmd = ShowProductById(merchantId: merchantId, productId: productId);
+      UiCommandBus.emit(cmd);
+      final result = await cmd.completed.future.timeout(
+        const Duration(seconds: 6),
+      );
+      final code = result['success'] == true
+          ? 200
+          : result['reason'] == 'PRODUCT_NOT_VISIBLE' ||
+                  result['reason'] == 'MERCHANT_UNAVAILABLE'
+              ? 404
+              : 409;
+      _sendJson(response, code, result);
+    } on TimeoutException {
+      _sendJson(response, 503, {
+        'success': false,
+        'message': 'Flutter no confirmo la presentacion',
+      });
+    } on FormatException {
+      _sendJson(response, 400, {
+        'success': false,
+        'message': 'JSON invalido',
+      });
+    } catch (e) {
+      _sendJson(response, 500, {
+        'success': false,
+        'message': 'No fue posible presentar el producto',
+      });
+      debugPrint('[AppServer] /operator/show-product: $e');
+    }
+  }
+
+  // -- Audio handlers --
+
+  Future<void> _handlePlayAudio(
+      HttpRequest request, HttpResponse response) async {
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      final json = jsonDecode(body) as Map<String, dynamic>;
+
+      final asset = json['asset'] as String?;
+      if (asset == null || asset.isEmpty) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'Body debe contener "asset" con la ruta del audio',
+        });
+        return;
+      }
+
+      final volume = (json['volume'] as num?)?.toDouble() ?? 1.0;
+      final force = json['force'] == true;
+
+      // Audio remoto: validar y descargar en caché antes de reproducir.
+      // Los audios locales siguen funcionando sin cambio de ruta.
+      String? localFilePath;
+      if (asset.startsWith('https://') || asset.startsWith('http://')) {
+        try {
+          final file = await MediaCache.instance.fetch(asset, MediaKind.audio);
+          localFilePath = file.path;
+        } on MediaCacheException catch (error) {
+          _sendJson(response, error.invalidUrl ? 400 : 502, {
+            'success': false,
+            'message': error.message,
+          });
+          return;
+        } catch (error) {
+          debugPrint('[AppServer] Error descargando audio remoto: $error');
+          _sendJson(response, 502, {
+            'success': false,
+            'message': 'No se pudo descargar el audio remoto',
+          });
+          return;
+        }
+      }
+
+      AudioService.setRemoteCall(true);
+
+      final showOverlay = json['showOverlay'] ?? true;
+
+      // displayText opcional: el remote-control puede enviar el texto a mostrar.
+      final displayText = json['displayText'] as String?;
+      final played = await AudioService.play(
+        asset,
+        volume: volume,
+        force: force,
+        displayText: displayText,
+        showOverlay: showOverlay,
+        localFilePath: localFilePath,
+      );
+
+      _sendJson(response, 200, {
+        'success': true,
+        'played': played,
+        'asset': asset,
+        'displayText': displayText,
+        'message': played
+            ? 'Reproduciendo "$asset"'
+            : 'Cooldown activo, audio omitido',
+      });
+    } catch (e) {
+      _sendJson(response, 400,
+          {'success': false, 'message': 'Error reproduciendo audio: $e'});
+    }
+  }
+
+  // -- Config handlers --
+
+  Future<void> _handleGetConfig(HttpResponse response) async {
+    final settings = AppSettings();
+    _sendJson(response, 200, {
+      'success': true,
+      'data': buildPublicConfigData(settings),
+    });
+  }
+
+  Future<void> _handlePostConfig(
+      HttpRequest request, HttpResponse response) async {
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      final json = jsonDecode(body) as Map<String, dynamic>;
+
+      if (json.isEmpty) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'El body no puede estar vacio',
+        });
+        return;
+      }
+
+      final settings = AppSettings();
+      final updated = <String, dynamic>{};
+      var needsReload = false;
+      var needsRestart = false;
+
+      // Solo actualiza los campos que vienen en el body.
+      if (json.containsKey('baseUrl')) {
+        settings.baseUrl = json['baseUrl'] as String;
+        updated['baseUrl'] = true;
+        needsRestart = true; // Dio se crea en ServiceLocator.init()
+      }
+      if (json.containsKey('bearerToken')) {
+        settings.bearerToken = json['bearerToken'] as String;
+        updated['bearerToken'] = true;
+        needsRestart = true; // Dio se crea en ServiceLocator.init()
+      }
+      if (json.containsKey('merchantId')) {
+        // Compatibilidad: merchantId (valor único) se convierte a merchantIds (lista)
+        settings.merchantIds = [(json['merchantId'] as num).toInt()];
+        updated['merchantId'] = true;
+        needsReload = true; // Producto puede recargarse en caliente
+      }
+      if (json.containsKey('merchantIds')) {
+        // Nuevo formato: lista de merchantIds
+        final merchantIdsJson = json['merchantIds'];
+        if (merchantIdsJson is List) {
+          settings.merchantIds =
+              merchantIdsJson.map((e) => (e as num).toInt()).toList();
+          updated['merchantIds'] = true;
+          needsReload = true; // Producto puede recargarse en caliente
+        }
+      }
+      if (json.containsKey('productId')) {
+        settings.productId = (json['productId'] as num).toInt();
+        updated['productId'] = true;
+        needsReload = true; // Producto puede recargarse en caliente
+      }
+
+      if (json.containsKey('baseUrlVpn')) {
+        settings.baseUrlVpn = json['baseUrlVpn'] as String;
+        updated['baseUrlVpn'] = true;
+        needsRestart = true; // Cambiar URL del servidor requiere reinicio
+      }
+      if (json.containsKey('portVpn')) {
+        settings.portVpn = (json['portVpn'] as num).toInt();
+        updated['portVpn'] = true;
+        needsRestart = true; // Cambiar puerto del servidor requiere reinicio
+      }
+
+      // La configuracion de conexion se toma del archivo .env.
+      // No se persiste en disco.
+
+      // Recargar producto en caliente si cambio merchantId o productId
+      if (needsReload) {
+        debugPrint(
+            '[AppServer] Config cambio (merchant/product) -> emitiendo reloadProduct');
+        UiCommandBus.emit(const ReloadProduct());
+      }
+
+      final messages = <String>[];
+      if (needsReload) messages.add('Producto recargado en caliente.');
+      if (needsRestart) {
+        messages.add('Reinicia la app para aplicar cambios de URL/Token.');
+      }
+      if (messages.isEmpty) messages.add('Configuracion guardada.');
+
+      _sendJson(response, 200, {
+        'success': true,
+        'message': messages.join(' '),
+        'updated': updated.keys.toList(),
+        'needsRestart': needsRestart,
+        'needsReload': needsReload,
+      });
+    } catch (e) {
+      _sendJson(
+          response, 400, {'success': false, 'message': 'JSON invalido: $e'});
+    }
+  }
+
+  // -- Merchants --
+
+  /// POST /merchants — Reemplaza la lista de merchants (la del `.env` queda
+  /// solo como valor de arranque) y recarga el catálogo.
+  ///
+  /// Body: `{"merchantIds": [53, 54, 90]}`. También acepta los ids como
+  /// texto (`["53", "54"]`). Responde enseguida; la carga sigue en segundo
+  /// plano y su resultado se ve en `GET /merchants`.
+  Future<void> _handleSetMerchants(
+      HttpRequest request, HttpResponse response) async {
+    final List<int> ids;
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      final json = jsonDecode(body);
+      if (json is! Map<String, dynamic>) {
+        throw const FormatException(
+            'El body debe ser {"merchantIds": [53, 54]}');
+      }
+      ids = parseMerchantIdsBody(json['merchantIds']);
+    } on FormatException catch (e) {
+      _sendJson(response, 400, {'success': false, 'message': e.message});
+      return;
+    }
+
+    final settings = AppSettings();
+    final previous = List.of(settings.merchantIds);
+    settings.merchantIds = ids;
+    debugPrint('[AppServer] Merchants $previous -> $ids: recargando catálogo');
+    UiCommandBus.emit(const ReloadProduct());
+
+    _sendJson(response, 200, {
+      'success': true,
+      'message': 'Merchants actualizados. Recargando catálogo; '
+          'consulta GET /merchants para ver cuáles cargaron.',
+      'previousMerchantIds': previous,
+      'merchantIds': ids,
+    });
+  }
+
+  // -- Product filter handlers --
+
+  /// POST /merchants/show — Lleva la pantalla a "Elige restaurante".
+  ///
+  /// Habilita todos los merchants del filtro (el selector del panel deja uno
+  /// solo y con uno solo la vista no existe). Los productos ocultos o fijados
+  /// se conservan. La vista solo aparece con 2+ merchants con productos
+  /// visibles; si no, se muestra el catálogo del único (`merchantChoice`).
+  void _handleShowMerchants(HttpResponse response) {
+    final filter = AppSettings().filterConfig;
+    filter.enabledMerchants.clear(); // vacío = todos habilitados
+
+    final cache = ProductCache();
+    final available = visibleMerchantIds(cache, filter);
+    final merchantChoice = available.length > 1;
+    UiCommandBus.emit(const ShowMerchantPicker());
+
+    _sendJson(response, 200, {
+      'success': true,
+      'mode': merchantChoice ? 'merchants' : 'product',
+      'merchantChoice': merchantChoice,
+      'availableMerchantIds': available,
+      'cacheLoaded': cache.isLoaded,
+      'message': merchantChoice
+          ? 'Mostrando "Elige restaurante" (${available.length} comercios)'
+          : 'Hay ${available.length} comercio(s) con productos visibles; '
+              'se muestra el catálogo directamente',
+    });
+  }
+
+  /// GET /products — Retorna todos los productos cargados, agrupados por merchant,
+  /// con su estado de visibilidad segun la configuracion de filtros.
+  Future<void> _handleGetProducts(HttpResponse response) async {
+    final cache = ProductCache();
+    final settings = AppSettings();
+
+    if (!cache.isLoaded) {
+      _sendJson(response, 200, {
+        'success': true,
+        'data': null,
+        'cacheLoaded': false,
+        'message': 'Productos aun no cargados. Espera a que la app inicie.',
+      });
+      return;
+    }
+
+    _sendJson(response, 200, {
+      'success': true,
+      'data': cache.buildProductsResponse(settings.filterConfig),
+      'cacheLoaded': true,
+    });
+  }
+
+  /// POST /products/filter — Actualiza la configuracion de filtros de productos.
+  ///
+  /// Body esperado:
+  /// ```json
+  /// {
+  ///   "merchants": { "53": { "enabled": true }, "54": { "enabled": false } },
+  ///   "products": { "457969": { "visible": false }, "457970": { "visible": true, "pinned": true } },
+  ///   "filterMode": "blacklist",
+  ///   "reload": true
+  /// }
+  /// ```
+  Future<void> _handlePostProductsFilter(
+      HttpRequest request, HttpResponse response) async {
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      final json = jsonDecode(body) as Map<String, dynamic>;
+
+      final settings = AppSettings();
+      final filter = settings.filterConfig;
+      final changes = <String>[];
+
+      // Actualizar merchants
+      if (json['merchants'] is Map) {
+        final merchants = json['merchants'] as Map<String, dynamic>;
+        for (final entry in merchants.entries) {
+          final merchantId = int.tryParse(entry.key) ?? 0;
+          final data = entry.value as Map<String, dynamic>?;
+          if (data == null) continue;
+
+          if (data.containsKey('enabled')) {
+            final enabled = data['enabled'] == true;
+            if (enabled) {
+              filter.enabledMerchants.add(merchantId);
+            } else {
+              filter.enabledMerchants.remove(merchantId);
+            }
+            changes.add(
+                'Merchant $merchantId: ${enabled ? "habilitado" : "deshabilitado"}');
+          }
+        }
+      }
+
+      // Actualizar productos
+      if (json['products'] is Map) {
+        final products = json['products'] as Map<String, dynamic>;
+        for (final entry in products.entries) {
+          final productId = int.tryParse(entry.key) ?? 0;
+          final data = entry.value as Map<String, dynamic>?;
+          if (data == null) continue;
+
+          if (data.containsKey('visible')) {
+            final visible = data['visible'] == true;
+            if (visible) {
+              filter.hiddenProducts.remove(productId);
+            } else {
+              filter.hiddenProducts.add(productId);
+            }
+            changes
+                .add('Producto $productId: ${visible ? "visible" : "oculto"}');
+          }
+
+          if (data.containsKey('pinned')) {
+            final pinned = data['pinned'] == true;
+            if (pinned) {
+              filter.pinnedProducts.add(productId);
+              filter.hiddenProducts
+                  .remove(productId); // Pinned no puede estar oculto
+            } else {
+              filter.pinnedProducts.remove(productId);
+            }
+            changes
+                .add('Producto $productId: ${pinned ? "fijado" : "desfijado"}');
+          }
+        }
+      }
+
+      // Actualizar modo de filtro
+      if (json['filterMode'] is String) {
+        final mode = json['filterMode'] as String;
+        if (['all', 'blacklist', 'whitelist'].contains(mode)) {
+          filter.filterMode = mode;
+          changes.add('Modo de filtro: $mode');
+        }
+      }
+
+      // Resetear si se pide
+      if (json['reset'] == true) {
+        filter.reset();
+        changes.add('Filtros reseteados');
+      }
+
+      // Los filtros viven solo en memoria (no se persisten en disco).
+      // Al reiniciar la app, todos los productos vuelven a ser visibles.
+
+      final reload = json['reload'] == true;
+      if (reload) {
+        debugPrint(
+            '[AppServer] Filtros actualizados -> emitiendo reloadProduct');
+        UiCommandBus.emit(const ReloadProduct());
+      }
+
+      _sendJson(response, 200, {
+        'success': true,
+        'message': changes.isEmpty ? 'Sin cambios' : changes.join('; '),
+        'changes': changes,
+        'filterMode': filter.filterMode,
+        'reloaded': reload,
+      });
+    } catch (e) {
+      _sendJson(
+          response, 400, {'success': false, 'message': 'JSON invalido: $e'});
+    }
+  }
+
+  /// POST /products/reload — Fuerza la recarga de productos desde la API.
+  Future<void> _handlePostProductsReload(HttpResponse response) async {
+    debugPrint('[AppServer] Recarga de productos solicitada');
+    UiCommandBus.emit(const ReloadProduct());
+    _sendJson(response, 200, {
+      'success': true,
+      'message':
+          'Recarga de productos disparada. Los productos se actualizaran en breve.',
+    });
+  }
+
+  /// POST /products/polling/force — Fuerza un poll incondicional de productos.
+  Future<void> _handleForceProductPoll(HttpResponse response) async {
+    debugPrint('[AppServer] Forzando poll de productos');
+    UiCommandBus.emit(const ForceProductPoll());
+    _sendJson(response, 200, {
+      'success': true,
+      'message': 'Poll de productos forzado.',
+    });
+  }
+
+  /// GET /products/polling/status — Retorna la configuración de staleness.
+  Future<void> _handleGetProductPollingStatus(HttpResponse response) async {
+    final settings = AppSettings();
+    _sendJson(response, 200, {
+      'success': true,
+      'data': {
+        'staleSeconds': settings.productPollingStaleSeconds,
+      },
+    });
+  }
+
+  /// POST /attract/set — Cambia el GIF de atraccion y lo muestra inmediatamente.
+  ///
+  /// Body esperado:
+  /// ```json
+  /// { "gif": "attract" }
+  /// ```
+  ///
+  /// El nombre se mapea a `assets/images/{gif}.gif`.
+  /// Si no se envia, se usa `"attract"` por defecto.
+  /// GIF local sin URL, o GIF remoto con URL validada por MediaCache.
+  /// En caso de error no cambia el GIF actual.
+  Future<void> _handleSetAttractGif(
+      HttpRequest request, HttpResponse response) async {
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'Se requiere un objeto JSON',
+        });
+        return;
+      }
+      final rawGif = decoded['gif'];
+      final rawUrl = decoded['url'];
+      if ((rawGif != null && rawGif is! String) ||
+          (rawUrl != null && rawUrl is! String)) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'gif y url deben ser cadenas de texto',
+        });
+        return;
+      }
+      final gifName = rawGif as String? ?? 'attract';
+      if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(gifName)) {
+        _sendJson(response, 400, {
+          'success': false,
+          'message': 'Identificador GIF invalido',
+        });
+        return;
+      }
+      final url = (rawUrl as String?)?.trim();
+      String? remoteUrl;
+      late final String assetPath;
+      if (url != null && url.isNotEmpty) {
+        try {
+          final file = await MediaCache.instance.fetch(url, MediaKind.image);
+          assetPath = file.path;
+          remoteUrl = url;
+        } on MediaCacheException catch (error) {
+          _sendJson(response, error.invalidUrl ? 400 : 502, {
+            'success': false,
+            'message': error.message,
+          });
+          return;
+        }
+      } else {
+        assetPath = 'assets/images/$gifName.gif';
+      }
+      UiCommandBus.currentGifName = gifName;
+      UiCommandBus.currentGifUrl = remoteUrl;
+      UiCommandBus.emit(ShowAttract(gifAsset: assetPath));
+      _sendJson(response, 200, {
+        'success': true,
+        'gif': gifName,
+        'assetPath': assetPath,
+        if (remoteUrl != null) 'url': remoteUrl,
+        'message': 'GIF seleccionado',
+      });
+    } on FormatException {
+      _sendJson(response, 400, {
+        'success': false,
+        'message': 'JSON invalido',
+      });
+    } catch (e) {
+      debugPrint('[AppServer] Error al cambiar GIF: $e');
+      _sendJson(response, 500, {
+        'success': false,
+        'message': 'No se pudo cambiar el GIF',
+      });
+    }
+  }
+
+  // -- JSON helper --
+
+  void _sendJson(
+      HttpResponse response, int statusCode, Map<String, dynamic> data) {
+    response.statusCode = statusCode;
+    response.write(jsonEncode(data));
+    response.close();
+  }
+
+  Future<void> stop() async {
+    await _server?.close();
+    _server = null;
+    if (kDebugMode) debugPrint('[AppServer] Servidor detenido.');
+  }
+}
+
+/// Normaliza una ruta de asset de audio recibida por HTTP.
+///
+/// [AudioService] usa rutas relativas a `assets/`, por ejemplo
+/// `audio/kiky/saludo.wav`. También se acepta el prefijo `assets/` para hacer
+/// el endpoint más tolerante, pero nunca rutas absolutas ni segmentos `..`.
+@visibleForTesting
+String? normalizeAudioAssetPath(String? rawPath) {
+  if (rawPath == null) return null;
+
+  var path = rawPath.trim().replaceAll('\\', '/');
+  if (path.startsWith('assets/')) path = path.substring('assets/'.length);
+
+  if (!path.startsWith('audio/') || path.length == 'audio/'.length) {
+    return null;
+  }
+  if (path.startsWith('/') || path.contains('://') || path.contains(':')) {
+    return null;
+  }
+
+  final segments = path.split('/');
+  if (segments
+      .any((segment) => segment.isEmpty || segment == '.' || segment == '..')) {
+    return null;
+  }
+
+  const supportedExtensions = {'.wav', '.mp3', '.m4a', '.ogg'};
+  final lowerPath = path.toLowerCase();
+  if (!supportedExtensions.any(lowerPath.endsWith)) return null;
+
+  return path;
+}
+
+/// Valida la lista de `POST /merchants`: enteros positivos (o texto con un
+/// entero), sin repetidos, al menos uno. Lanza [FormatException] con un
+/// mensaje para el cliente si algo no sirve.
+@visibleForTesting
+List<int> parseMerchantIdsBody(Object? raw) {
+  if (raw is! List) {
+    throw const FormatException(
+        'Falta "merchantIds" como lista, ej: {"merchantIds": [53, 54]}');
+  }
+  final ids = <int>[];
+  for (final value in raw) {
+    final id = switch (value) {
+      int v => v,
+      double v when v == v.truncateToDouble() => v.toInt(),
+      String v => int.tryParse(v.trim()),
+      _ => null,
+    };
+    if (id == null || id <= 0) {
+      throw FormatException('Id de merchant inválido: ${jsonEncode(value)}');
+    }
+    if (!ids.contains(id)) ids.add(id);
+  }
+  if (ids.isEmpty) {
+    throw const FormatException('"merchantIds" no puede estar vacía');
+  }
+  return ids;
+}
+
+/// Respuesta de `GET /merchants`: los configurados y, de la última carga,
+/// cuáles respondieron y cuántos productos trajo cada uno.
+@visibleForTesting
+Map<String, dynamic> buildMerchantsData(
+    AppSettings settings, ProductCache cache) {
+  final loaded = cache.loadedMerchantIds;
+  return {
+    'merchantIds': settings.merchantIds,
+    'loaded': [
+      for (final (i, id) in loaded.indexed)
+        {
+          'merchantId': id,
+          'merchantName':
+              i < cache.merchantNames.length ? cache.merchantNames[i] : null,
+          'productCount':
+              cache.allProducts.where((p) => p.merchantId == id).length,
+        },
+    ],
+    'failedMerchantIds': cache.isLoaded
+        ? [
+            for (final id in settings.merchantIds)
+              if (!loaded.contains(id)) id
+          ]
+        : <int>[],
+    'cacheLoaded': cache.isLoaded,
+  };
+}
+
+/// Merchants cargados que tienen al menos un producto visible con [filter],
+/// en el orden de carga. Son los que aparecen en "Elige restaurante".
+@visibleForTesting
+List<int> visibleMerchantIds(ProductCache cache, ProductFilterConfig filter) =>
+    [
+      for (final id in cache.loadedMerchantIds)
+        if (cache.allProducts.any(
+            (p) => p.merchantId == id && filter.isProductVisible(p.id, id)))
+          id,
+    ];
+
+/// Construye la configuracion que puede exponerse mediante la API local.
+///
+/// Las credenciales se excluyen deliberadamente. El token puede actualizarse
+/// mediante `POST /config`, pero nunca se devuelve al cliente de control.
+@visibleForTesting
+Map<String, dynamic> buildPublicConfigData(AppSettings settings) => {
+      'baseUrl': settings.baseUrl,
+      'merchantId': settings.merchantId, // Compatibilidad: primer merchant
+      'merchantIds': settings.merchantIds,
+      'productId': settings.productId,
+      'baseUrlVpn': settings.baseUrlVpn,
+      'portVpn': settings.portVpn,
+    };

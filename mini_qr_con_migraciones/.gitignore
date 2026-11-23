@@ -1,0 +1,30 @@
+﻿
+# Archivos privados y compilaciones
+.env
+.env.*
+!.env.example
+build/
+.dart_tool/
+.gradle/
+node_modules/
+linux/flutter/ephemeral/
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+
+# Archivos privados y compilaciones
+.env
+.env.*
+!.env.example
+build/
+.dart_tool/
+.gradle/
+node_modules/
+linux/flutter/ephemeral/
+*.pem
+*.key
+*.p12
+*.pfx
+*.log

@@ -1,0 +1,126 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
+import '../models/place_order_request.dart';
+import '../models/qr_models.dart';
+import '../models/update_order_request.dart';
+
+/// Excepcion generica de servidor.
+class ServerException implements Exception {
+  final String? message;
+  ServerException([this.message]);
+
+  @override
+  String toString() => 'ServerException: ${message ?? 'Error del servidor'}';
+}
+
+/// Interface del data source remoto para operaciones QR.
+abstract class QrPaymentRemoteDataSource {
+  /// Crea un pedido en estado pendiente.
+  /// Endpoint: POST /orders/create-pending
+  Future<PlaceOrderResponseDto> placeOrderPending(PlaceOrderRequestDto request);
+
+  /// Genera el QR de pago para un pedido existente.
+  /// Endpoint: POST /payments/qr/generate-payment
+  Future<GeneratePaymentQrResponseDto> generatePaymentQr(
+    GeneratePaymentQrRequestDto request,
+  );
+
+  /// Consulta el estado del pago QR.
+  /// Endpoint: GET /payments/qr/status/:merchantId/:orderId
+  Future<PaymentStatusDto> getPaymentStatus(int merchantId, int orderId);
+
+  /// Actualiza datos de un pedido existente (nombre, nit, etc).
+  /// Endpoint: PUT /orders/{id}
+  Future<void> updateOrder(int orderId, UpdateOrderRequestDto request);
+
+  /// Completa un pedido pendiente.
+  /// Endpoint: POST /orders/complete/:id
+  Future<void> completeOrder(int orderId);
+}
+
+class QrPaymentRemoteDataSourceImpl implements QrPaymentRemoteDataSource {
+  final Dio _dio;
+
+  QrPaymentRemoteDataSourceImpl(this._dio);
+
+  @override
+  Future<PlaceOrderResponseDto> placeOrderPending(
+    PlaceOrderRequestDto request,
+  ) async {
+    try {
+      debugPrint('[QR_DS] POST /orders/create-pending');
+      final response =
+          await _dio.post('/orders/create-pending', data: request.toJson());
+      debugPrint('[QR_DS] Respuesta create-pending: ${response.data}');
+      return PlaceOrderResponseDto.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } catch (e) {
+      debugPrint('[QR_DS] ERROR en placeOrderPending: $e');
+      throw ServerException('placeOrderPending failed: $e');
+    }
+  }
+
+  @override
+  Future<GeneratePaymentQrResponseDto> generatePaymentQr(
+    GeneratePaymentQrRequestDto request,
+  ) async {
+    try {
+      debugPrint('[QR_DS] POST /payments/qr/generate-payment');
+      debugPrint('[QR_DS] Body generate-payment: ${request.toJson()}');
+      final response = await _dio.post(
+        '/payments/qr/generate-payment',
+        data: request.toJson(),
+      );
+      debugPrint('[QR_DS] Respuesta generate-payment: ${response.data}');
+      return GeneratePaymentQrResponseDto.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } catch (e) {
+      debugPrint('[QR_DS] ERROR en generatePaymentQr: $e');
+      throw ServerException('generatePaymentQr failed: $e');
+    }
+  }
+
+  @override
+  Future<PaymentStatusDto> getPaymentStatus(
+    int merchantId,
+    int orderId,
+  ) async {
+    try {
+      // Log de cada consulta (fase 8, § 8.17): permite comprobar en el log
+      // que se consulta cada ~3 s y una sola a la vez (inicio → respuesta).
+      debugPrint('[QR_DS] GET /payments/qr/status/$merchantId/$orderId');
+      final response =
+          await _dio.get('/payments/qr/status/$merchantId/$orderId');
+      debugPrint('[QR_DS] Estado orden $orderId: '
+          '${(response.data as Map<String, dynamic>?)?['status']}');
+      return PaymentStatusDto.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } catch (e) {
+      throw ServerException('getPaymentStatus failed: $e');
+    }
+  }
+
+  @override
+  Future<void> updateOrder(int orderId, UpdateOrderRequestDto request) async {
+    try {
+      await _dio.put('/orders/$orderId', data: request.toJson());
+    } catch (e) {
+      throw ServerException('updateOrder failed: $e');
+    }
+  }
+
+  @override
+  Future<void> completeOrder(int orderId) async {
+    try {
+      // Fase 8 (§ 8.17): debe aparecer UNA sola vez por orden pagada.
+      debugPrint('[QR_DS] POST /orders/complete/$orderId');
+      await _dio.post('/orders/complete/$orderId');
+    } catch (e) {
+      throw ServerException('completeOrder failed: $e');
+    }
+  }
+}
